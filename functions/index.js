@@ -5,14 +5,14 @@ const { Shopify } = require('@shopify/shopify-api');
 
 const app = express();
 
-// Initialize Shopify API Context with your config
+// Initialize Shopify API Context
 Shopify.Context.initialize({
-  API_KEY: functions.config().shopify.key, // set via Firebase functions:config:set
-  API_SECRET_KEY: functions.config().shopify.secret,
-  SCOPES: ['read_products'], // Adjust scopes as needed
-  HOST_NAME: 'your-app-url.web.app', // Update with your Firebase Hosting domain (no protocol)
-  IS_EMBEDDED_APP: false, // Change to true if you’re building an embedded app
-  API_VERSION: '2023-04', // Use current API version
+  API_KEY: functions.config().shopify.key,         // Set via Firebase config
+  API_SECRET_KEY: functions.config().shopify.secret, // Set via Firebase config
+  SCOPES: ['read_products'],                         // Adjust scopes as needed
+  HOST_NAME: 'your-project-id.web.app',              // Your Firebase Hosting domain (without protocol)
+  IS_EMBEDDED_APP: false,                           // Change to true if using embedded app features
+  API_VERSION: '2023-04',                           // Use an API version that works for you
 });
 
 // Route to initiate OAuth
@@ -21,25 +21,26 @@ app.get('/auth', async (req, res) => {
   if (!shop) return res.status(400).send('Missing shop parameter.');
 
   // Generate the auth URL and redirect the user
-  const authRoute = await Shopify.Auth.beginAuth(
-    req,
-    res,
-    shop,
-    '/auth/callback',
-    false
-  );
-  return res.redirect(authRoute);
+  try {
+    const authRoute = await Shopify.Auth.beginAuth(
+      req,
+      res,
+      shop,
+      '/auth/callback',
+      false
+    );
+    return res.redirect(authRoute);
+  } catch (error) {
+    console.error('Error during OAuth initiation:', error);
+    return res.status(500).send(error.message);
+  }
 });
 
 // OAuth callback route
 app.get('/auth/callback', async (req, res) => {
   try {
-    const session = await Shopify.Auth.validateAuthCallback(
-      req,
-      res,
-      req.query
-    );
-    // Here, you’d typically store the session data (e.g., in Firestore)
+    const session = await Shopify.Auth.validateAuthCallback(req, res, req.query);
+    // Save the session details as needed (e.g., in Firestore)
     return res.send('Shopify app installed successfully!');
   } catch (error) {
     console.error('OAuth callback error:', error);
@@ -47,5 +48,5 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
-// Expose the Express API as a single Cloud Function:
+// Export the Express app as a Cloud Function named "shopifyApp"
 exports.shopifyApp = functions.https.onRequest(app);
